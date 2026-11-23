@@ -667,6 +667,21 @@ a {
   color: #f2d06b;
 }
 
+/* Hidden input that raises the mobile numeric keyboard */
+.termHiddenInput {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  pointer-events: none;
+  /* 16px prevents iOS from zooming the page on focus */
+  font-size: 16px;
+  caret-color: transparent;
+}
+
 /* Prompt line */
 .termLine {
   display: flex;

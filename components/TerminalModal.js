@@ -24,6 +24,7 @@ export default function TerminalModal({ onClose, initialPhase = "booting" }) {
   const captureRef = useRef(false);
   const inputRef = useRef("");
   const busyRef = useRef(false);
+  const hiddenInputRef = useRef(null);
 
   const addLine = useCallback((html) => {
     setLog((prev) => [...prev, html]);
@@ -156,6 +157,30 @@ export default function TerminalModal({ onClose, initialPhase = "booting" }) {
     if (phase === "success") captureRef.current = false;
   }, [phase]);
 
+  // Mobile: the hidden input is the only way to raise the on-screen keyboard.
+  useEffect(() => {
+    if (phase === "prompt") {
+      // Defer so the element is mounted before focusing.
+      const t = setTimeout(() => hiddenInputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [phase]);
+
+  // Value change handler shared by the hidden input (mobile) and typing (desktop).
+  function applyInput(raw) {
+    const digits = String(raw).replace(/[^0-9]/g, "").slice(0, 4);
+    inputRef.current = digits;
+    setInput(digits);
+  }
+
+  // Keep a real input mounted so tapping anywhere on the terminal opens the
+  // numeric keyboard on touch devices.
+  function focusHiddenInput() {
+    if (phase === "prompt" && !busyRef.current) {
+      hiddenInputRef.current?.focus();
+    }
+  }
+
   function onOverlayClick(e) {
     if (e.target === e.currentTarget) onClose();
   }
@@ -182,14 +207,37 @@ export default function TerminalModal({ onClose, initialPhase = "booting" }) {
               ✕
             </button>
           </div>
-          <div className="termScreen">
+          <div className="termScreen" onClick={focusHiddenInput}>
             <div className="termLog" ref={logRef}>
               {log.map((html, i) => (
                 <div key={i} dangerouslySetInnerHTML={{ __html: html }} />
               ))}
             </div>
             {phase === "prompt" && (
-              <div className="termLine">
+              <input
+                ref={hiddenInputRef}
+                className="termHiddenInput"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
+                maxLength={4}
+                aria-label="PIN"
+                value={input}
+                onChange={(e) => applyInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    authenticate();
+                  }
+                }}
+              />
+            )}
+            {phase === "prompt" && (
+              <div className="termLine" onClick={focusHiddenInput}>
                 <span
                   className="termPrompt"
                   dangerouslySetInnerHTML={{
