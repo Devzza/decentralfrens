@@ -6,8 +6,6 @@ import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import BinaryCanvas from "@/components/BinaryCanvas";
 import TerminalModal from "@/components/TerminalModal";
-import WLModal from "@/components/WLModal";
-import { supabase } from "@/lib/supabase";
 import { usePrivyAvailable } from "@/app/providers";
 
 // Black/green ENTER button, only rendered when the user is logged in.
@@ -32,27 +30,7 @@ export default function HomePage() {
   const [revealed, setRevealed] = useState(false);
   const [fading, setFading] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
-  const [wlModalOpen, setWlModalOpen] = useState(false);
   const [skipToSuccess, setSkipToSuccess] = useState(false);
-
-  const handleWLSubmit = async (email) => {
-    try {
-      const { error } = await supabase
-        .from('waitlist')
-        .insert([{ email }]);
-
-      if (error) {
-        console.error('Supabase error:', error.message);
-        throw new Error(error.message);
-      }
-      
-      console.log('WL Application successful for:', email);
-      return Promise.resolve();
-    } catch (err) {
-      console.error('WL Submission failed:', err);
-      throw err;
-    }
-  };
 
   // Auto-redirect to success screen if returning from login and PIN was passed
   useEffect(() => {
@@ -87,7 +65,7 @@ export default function HomePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [terminalOpen]);
 
-  // Fallback: any click on the landing (except header/footer/waitlist) reveals
+  // Fallback: any click on the landing (except header/footer) reveals
   function onLandingClick(e) {
     if (e.target.closest("a, button, .landingHeader, .landingFooter")) return;
     reveal();
@@ -123,14 +101,6 @@ export default function HomePage() {
         />
       )}
 
-      {wlModalOpen && (
-        <WLModal 
-          isOpen={wlModalOpen} 
-          onClose={() => setWlModalOpen(false)} 
-          onSubmit={handleWLSubmit}
-        />
-      )}
-
       {/* The public landing (the "reality") */}
       <div
         className={`landing${fading && !revealed ? " fade" : ""}${
@@ -159,12 +129,6 @@ export default function HomePage() {
               ABOUT
             </Link>
             <ProfileButton />
-            <button 
-              onClick={() => setWlModalOpen(true)} 
-              className="btnWaitlist"
-            >
-              Waitlist
-            </button>
           </div>
         </header>
 
