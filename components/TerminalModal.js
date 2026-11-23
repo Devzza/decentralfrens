@@ -157,14 +157,17 @@ export default function TerminalModal({ onClose, initialPhase = "booting" }) {
     if (phase === "success") captureRef.current = false;
   }, [phase]);
 
-  // Mobile: the hidden input is the only way to raise the on-screen keyboard.
+  // iOS Safari only opens the keyboard from inside a user gesture, so we never
+  // auto-focus. Instead we keep a fully transparent, viewport-sized input that
+  // sits under the terminal: a tap anywhere lands on it and raises the keyboard.
+
+  // Submit whenever four digits are typed (mobile has no Enter key guarantee).
   useEffect(() => {
-    if (phase === "prompt") {
-      // Defer so the element is mounted before focusing.
-      const t = setTimeout(() => hiddenInputRef.current?.focus(), 50);
+    if (phase === "prompt" && input.length === 4 && !busyRef.current) {
+      const t = setTimeout(() => authenticate(), 120);
       return () => clearTimeout(t);
     }
-  }, [phase]);
+  }, [input, phase, authenticate]);
 
   // Value change handler shared by the hidden input (mobile) and typing (desktop).
   function applyInput(raw) {
@@ -173,16 +176,26 @@ export default function TerminalModal({ onClose, initialPhase = "booting" }) {
     setInput(digits);
   }
 
-  // Keep a real input mounted so tapping anywhere on the terminal opens the
-  // numeric keyboard on touch devices.
-  function focusHiddenInput() {
-    if (phase === "prompt" && !busyRef.current) {
-      hiddenInputRef.current?.focus();
-    }
+  // Called from a real user gesture (tap). This is the only reliable way to
+  // raise the iOS keyboard.
+  function focusHiddenInput(e) {
+    if (phase !== "prompt" || busyRef.current) return;
+    // Prevent the tap from also triggering overlay-close logic.
+    e?.stopPropagation?.();
+    const el = hiddenInputRef.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
   }
 
   function onOverlayClick(e) {
-    if (e.target === e.currentTarget) onClose();
+    if (e.target !== e.currentTarget) return;
+    // While entering the PIN on mobile, a stray tap outside should not close
+    // the terminal; just refocus the input instead.
+    if (phase === "prompt") {
+      focusHiddenInput(e);
+      return;
+    }
+    onClose();
   }
 
   const pinMask = "\u2588".repeat(input.length);
@@ -217,17 +230,18 @@ export default function TerminalModal({ onClose, initialPhase = "booting" }) {
               <input
                 ref={hiddenInputRef}
                 className="termHiddenInput"
-                type="text"
+                type="tel"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                autoComplete="off"
+                autoComplete="one-time-code"
                 autoCorrect="off"
-                autoCapitalize="off"
+                autoCapitalize="none"
                 spellCheck="false"
-                maxLength={4}
+                enterKeyHint="go"
                 aria-label="PIN"
                 value={input}
                 onChange={(e) => applyInput(e.target.value)}
+                onInput={(e) => applyInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
